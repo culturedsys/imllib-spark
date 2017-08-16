@@ -21,6 +21,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
 import com.intel.imllib.crf.nlp._
+import com.intel.imllib.crf.nlp.Implicits._
 
 object CRFExample {
 

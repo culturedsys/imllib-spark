@@ -79,14 +79,6 @@ case class CRFModel (
     * @param tests  Source files to be verified
     * @return Source files with the predictive labels
     */
-  def predict(tests: RDD[Sequence]): RDD[Sequence] = {
-    val deFeatureIdx = new FeatureIndex()
-    deFeatureIdx.readModel(this)
-    val bcModel = tests.context.broadcast(this)
-    val bcFeature = tests.context.broadcast(deFeatureIdx)
-    tests.map(bcModel.value.testCRF(_, bcFeature.value))
-  }
-
   def predict(tests: Array[Sequence]): Array[Sequence] = {
     val deFeatureIdx = new FeatureIndex()
     deFeatureIdx.readModel(this)
@@ -217,5 +209,17 @@ object CRFModel {
 
   def saveArray(model: CRFModel): Array[String] = {
     model.toArrayString
+  }
+}
+
+object Implicits {
+  implicit class CRFModelRDD(wrapped: CRFModel) {
+    def predict(tests: RDD[Sequence]): RDD[Sequence] = {
+      val deFeatureIdx = new FeatureIndex()
+      deFeatureIdx.readModel(wrapped)
+      val bcModel = tests.context.broadcast(wrapped)
+      val bcFeature = tests.context.broadcast(deFeatureIdx)
+      tests.map(bcModel.value.testCRF(_, bcFeature.value))
+    }
   }
 }
