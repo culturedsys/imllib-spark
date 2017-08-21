@@ -18,7 +18,8 @@
 package com.intel.imllib.crf.nlp
 
 import java.io._
-import java.nio.file.{StandardOpenOption, Paths, Files}
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Paths, StandardOpenOption}
 
 import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.rdd.RDD
@@ -161,6 +162,38 @@ object CRFModel {
     CRFModel(head, dic, alpha)
   }
 
+  def loadStream(is: InputStream): CRFModel = {
+    val bis = new BufferedInputStream(is)
+    val source = ArrayBuffer[Byte]()
+    var c = bis.read().toByte
+
+    val newline = "\n".getBytes(StandardCharsets.UTF_8).head
+    while (c != newline) {
+      source += c
+      c = bis.read().toByte
+    }
+
+    val components = new String(source.toArray, StandardCharsets.UTF_8).split("\\|--\\|")
+
+    require(components.length == 2, "Incompatible formats in Model file")
+
+    val head = components(0).split("\t")
+    val dic = components(1).split("\t").map(x => {
+      val xx = x.split("\\|-\\|")
+      require(xx.length == 2, s"Incompatible formats in Model file: $x")
+      (xx(0), xx(1).toInt)
+    })
+
+    val alpha = Array.fill(head(1).toInt)(0.0)
+
+    val in: DataInputStream = new DataInputStream(bis)
+    for(i <- alpha.indices) {
+      alpha(i) = in.readFloat()
+    }
+
+    CRFModel(head, dic, alpha)
+  }
+
   def loadArray(source: Array[String]): CRFModel = {
     val head = new ArrayBuffer[String]()
     val dic = new ArrayBuffer[String]()
@@ -205,6 +238,18 @@ object CRFModel {
     for(i <- alpha.indices)
       out.writeFloat(alpha(i))
     out.close()
+  }
+
+  def saveStream(model: CRFModel, os: OutputStream): Unit = {
+    val bos = new BufferedOutputStream(os)
+    val head = model.toStringHead
+    bos.write(head.getBytes(StandardCharsets.UTF_8))
+    bos.write("\n".getBytes(StandardCharsets.UTF_8))
+    val out: DataOutputStream = new DataOutputStream(bos)
+    val alpha = model.alpha.map(_.toFloat)
+    for(i <- alpha.indices)
+      out.writeFloat(alpha(i))
+    out.flush()
   }
 
   def saveArray(model: CRFModel): Array[String] = {
